@@ -2,7 +2,7 @@
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Route, Switch } from "wouter";
-import { AuthPage } from "./pages/auth-page";
+import AuthPage from "./pages/auth-page";
 import { HomePage } from "./pages/home-page";
 import { IPDetailsPage } from "./pages/ip-details-page";
 import { NotFound } from "./pages/not-found.tsx";
