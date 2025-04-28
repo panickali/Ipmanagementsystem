@@ -97,12 +97,8 @@ async function startBlockchain() {
       },
       logging: {
         quiet: false
-      },
-      // Configure server to automatically find a free port if 8545 is in use
-      server: {
-        port: 8545,
-        host: "0.0.0.0"
       }
+      // Note: Port is specified in listen() call below
     });
     
     // Try to start the server

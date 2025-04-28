@@ -179,8 +179,10 @@ export async function registerIP(ipfsHash: string, metadata: any, ownerAddress: 
       // Return a mock transaction hash for demonstration
       return `0x${Math.random().toString(16).substring(2, 42)}`;
     }
-  } catch (error) {
-    console.error('Error registering IP on blockchain:', error);
+  } catch (err) {
+    console.error('Error registering IP on blockchain:', err);
+    // Handle unknown error type safely
+    const error = err as any;
     const errorMessage = error && typeof error === 'object' && 'message' in error
       ? error.message
       : 'Unknown error';
@@ -199,9 +201,13 @@ export async function transferOwnership(ipfsHash: string, fromAddress: string, t
   try {
     // Mock transfer
     return `0x${Math.random().toString(16).substring(2, 42)}`;
-  } catch (error) {
-    console.error('Error transferring ownership on blockchain:', error);
-    throw new Error('Failed to transfer ownership on blockchain');
+  } catch (err) {
+    console.error('Error transferring ownership on blockchain:', err);
+    const error = err as any;
+    const errorMessage = error && typeof error === 'object' && 'message' in error
+      ? error.message
+      : 'Unknown error';
+    throw new Error(`Failed to transfer ownership on blockchain: ${errorMessage}`);
   }
 }
 
@@ -216,9 +222,13 @@ export async function createLicense(ipfsHash: string, licenseData: any, ownerAdd
   try {
     // Mock license creation
     return `0x${Math.random().toString(16).substring(2, 42)}`;
-  } catch (error) {
-    console.error('Error creating license on blockchain:', error);
-    throw new Error('Failed to create license on blockchain');
+  } catch (err) {
+    console.error('Error creating license on blockchain:', err);
+    const error = err as any;
+    const errorMessage = error && typeof error === 'object' && 'message' in error
+      ? error.message
+      : 'Unknown error';
+    throw new Error(`Failed to create license on blockchain: ${errorMessage}`);
   }
 }
 
@@ -231,9 +241,13 @@ export async function verifyOwnership(ipfsHash: string): Promise<string> {
   try {
     // Mock verification
     return '0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9';
-  } catch (error) {
-    console.error('Error verifying ownership on blockchain:', error);
-    throw new Error('Failed to verify ownership on blockchain');
+  } catch (err) {
+    console.error('Error verifying ownership on blockchain:', err);
+    const error = err as any;
+    const errorMessage = error && typeof error === 'object' && 'message' in error
+      ? error.message
+      : 'Unknown error';
+    throw new Error(`Failed to verify ownership on blockchain: ${errorMessage}`);
   }
 }
 
@@ -249,7 +263,9 @@ export async function checkBlockchainStatus(): Promise<{ connected: boolean; net
       network: network.name === 'unknown' ? 'Development' : network.name,
       nodeUrl: blockchainConfig.url
     };
-  } catch (error) {
+  } catch (err) {
+    // Just log the error and return disconnected status
+    console.warn('Error checking blockchain status:', err);
     return {
       connected: false,
       network: 'Unknown',
