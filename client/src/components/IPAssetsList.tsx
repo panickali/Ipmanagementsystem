@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Eye, Edit, Trash2, Copy, Search } from "lucide-react";
+import { Eye, Edit, Trash2, Copy, Search, CheckCircle } from "lucide-react";
 import { IPAsset } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { formatDate, truncateText, timeSince } from "@/lib/utils";
 
 // Helper types
 type IPAssetType = "copyright" | "patent" | "trademark" | "design";
@@ -42,13 +44,30 @@ const IPAssetsList = () => {
     queryKey: ["/api/ip-assets"],
   });
 
-  // Copy IPFS hash to clipboard
-  const copyToClipboard = (text: string) => {
+  // Animation state for item feedback
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [highlightedRow, setHighlightedRow] = useState<number | null>(null);
+  
+  // Copy IPFS hash to clipboard with visual feedback
+  const copyToClipboard = (text: string, assetId: number) => {
     navigator.clipboard.writeText(text).then(
       () => {
+        // Set the copied hash for animation
+        setCopiedHash(text);
+        // Highlight the row
+        setHighlightedRow(assetId);
+        
+        // Show toast notification
         toast({
-          description: "IPFS hash copied to clipboard",
+          title: "Success",
+          description: "IPFS hash copied to clipboard"
         });
+        
+        // Reset animation states after delay
+        setTimeout(() => {
+          setCopiedHash(null);
+          setHighlightedRow(null);
+        }, 1500);
       },
       (err) => {
         toast({
@@ -249,64 +268,128 @@ const IPAssetsList = () => {
           <TableBody>
             {paginatedAssets.length > 0 ? (
               paginatedAssets.map((asset) => (
-                <TableRow key={asset.id}>
+                <TableRow 
+                  key={asset.id} 
+                  className={`hover-lift ${highlightedRow === asset.id ? 'animate-highlight' : ''}`}
+                >
                   <TableCell>
                     <div className="flex items-center">
-                      {getAssetTypeIcon(asset.type as IPAssetType)}
+                      <div className={`transition-transform hover:scale-110 duration-200`}>
+                        {getAssetTypeIcon(asset.type as IPAssetType)}
+                      </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-neutral-900">{asset.name}</div>
-                        <div className="text-sm text-neutral-500">ID: IP-{asset.id.toString().padStart(7, '0')}</div>
+                        <div className="text-sm font-medium text-neutral-900 hover:text-primary transition-colors">
+                          {asset.name}
+                        </div>
+                        <div className="text-sm text-neutral-500">
+                          ID: IP-{asset.id.toString().padStart(7, '0')}
+                        </div>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    {getTypeBadge(asset.type as IPAssetType)}
+                    <div className="transition-all hover:scale-105 duration-200">
+                      {getTypeBadge(asset.type as IPAssetType)}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-neutral-700">
-                    {new Date(asset.registrationDate).toLocaleDateString()}
+                    <TooltipProvider>
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help">
+                            {formatDate(asset.registrationDate)}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-white shadow-md border border-neutral-200 p-2 rounded-md">
+                          <p className="text-xs">{timeSince(asset.registrationDate)}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableCell>
                   <TableCell>
-                    {getStatusBadge(asset.status as AssetStatus)}
+                    <div className="transition-all hover:opacity-80 duration-200">
+                      {getStatusBadge(asset.status as AssetStatus)}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center">
-                      <span className="font-mono text-xs text-neutral-700 truncate max-w-[150px]">
-                        {asset.ipfsHash}
+                    <div className="flex items-center group">
+                      <span className={`font-mono text-xs ${copiedHash === asset.ipfsHash ? 'text-primary font-semibold' : 'text-neutral-700'} truncate max-w-[150px] transition-colors`}>
+                        {truncateText(asset.ipfsHash, 16)}
                       </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="ml-2 text-neutral-400 hover:text-neutral-700"
-                        onClick={() => copyToClipboard(asset.ipfsHash)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={`ml-2 ${copiedHash === asset.ipfsHash ? 'text-primary' : 'text-neutral-400 group-hover:text-neutral-700'} 
+                                transition-all duration-200 ${copiedHash === asset.ipfsHash ? 'animate-pulse-once' : ''}`}
+                              onClick={() => copyToClipboard(asset.ipfsHash, asset.id)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">Copy IPFS hash to clipboard</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex justify-center space-x-2">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/ip/${asset.id}`}>
-                          <Eye className="h-4 w-4 text-primary hover:text-primary-dark" />
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/ip/${asset.id}/edit`}>
-                          <Edit className="h-4 w-4 text-secondary hover:text-secondary-dark" />
-                        </Link>
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => {
-                          toast({
-                            title: "Feature not implemented",
-                            description: "Delete functionality would be implemented in a production system."
-                          });
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" asChild className="transition-transform hover:scale-110 duration-200">
+                              <Link href={`/ip/${asset.id}`}>
+                                <Eye className="h-4 w-4 text-primary hover:text-primary-dark" />
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">View details</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" asChild className="transition-transform hover:scale-110 duration-200">
+                              <Link href={`/ip/${asset.id}/edit`}>
+                                <Edit className="h-4 w-4 text-secondary hover:text-secondary-dark" />
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">Edit asset</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="transition-transform hover:scale-110 duration-200"
+                              onClick={() => {
+                                toast({
+                                  title: "Feature not implemented",
+                                  description: "Delete functionality would be implemented in a production system."
+                                });
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">Delete asset</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </TableCell>
                 </TableRow>
