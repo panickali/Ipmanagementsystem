@@ -6,17 +6,17 @@ const AppFooter = () => {
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="md:flex md:items-center md:justify-between">
           <div className="flex justify-center md:justify-start space-x-6">
-            <Link href="/about">
-              <a className="text-neutral-500 hover:text-neutral-700">About</a>
+            <Link href="/about" className="text-neutral-500 hover:text-neutral-700">
+              About
             </Link>
-            <Link href="/docs">
-              <a className="text-neutral-500 hover:text-neutral-700">Documentation</a>
+            <Link href="/docs" className="text-neutral-500 hover:text-neutral-700">
+              Documentation
             </Link>
-            <Link href="/privacy">
-              <a className="text-neutral-500 hover:text-neutral-700">Privacy Policy</a>
+            <Link href="/privacy" className="text-neutral-500 hover:text-neutral-700">
+              Privacy Policy
             </Link>
-            <Link href="/gdpr">
-              <a className="text-neutral-500 hover:text-neutral-700">GDPR</a>
+            <Link href="/gdpr" className="text-neutral-500 hover:text-neutral-700">
+              GDPR
             </Link>
           </div>
           <div className="mt-8 md:mt-0">
