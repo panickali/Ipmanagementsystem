@@ -1,4 +1,3 @@
-
 import { create } from 'ipfs';
 import ganache from 'ganache';
 import { ethers } from 'ethers';
@@ -9,11 +8,11 @@ import path from 'path';
 function cleanupIPFSLock() {
   try {
     const repoLockPath = path.join('.ipfs', 'repo.lock');
-    
+
     if (fs.existsSync(repoLockPath)) {
       console.log('Removing stale IPFS repo lock...');
       const stats = fs.statSync(repoLockPath);
-      
+
       if (stats.isDirectory()) {
         // It's a directory, try to remove it recursively (but only if it's the lock directory)
         if (repoLockPath.endsWith('repo.lock')) {
@@ -43,7 +42,7 @@ async function startIPFSNode() {
   try {
     // First try to clean up any stale lock file
     cleanupIPFSLock();
-    
+
     const ipfs = await create({
       repo: './.ipfs',
       start: true,
@@ -67,19 +66,19 @@ async function startIPFSNode() {
         }
       }
     });
-    
+
     const id = await ipfs.id();
     console.log('IPFS node started:', id.id);
     return ipfs;
   } catch (error) {
     console.error('Failed to start IPFS node:', error);
-    
+
     // If we still have a lock issue, just warn instead of crashing the app
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_LOCK_EXISTS') {
       console.warn('IPFS lock exists. Continuing without local IPFS node.');
       return null;
     }
-    
+
     throw error;
   }
 }
@@ -93,7 +92,7 @@ async function startBlockchain() {
   } catch (e) {
     // Ignore if can't connect or destroy
   }
-  
+
   try {
     // Create a new ganache server
     const server = ganache.server({
@@ -106,16 +105,16 @@ async function startBlockchain() {
       }
       // Note: Port is specified in listen() call below
     });
-    
+
     // Try to start the server
     await server.listen(8545);
     console.log('Ganache blockchain started on port 8545');
-    
+
     // Get default accounts
     const provider = new ethers.JsonRpcProvider('http://0.0.0.0:8545');
     const accounts = await provider.listAccounts();
     console.log('Available accounts:', accounts);
-    
+
     return server;
   } catch (error) {
     console.error('Failed to start blockchain:', error);
@@ -129,21 +128,21 @@ async function startBlockchain() {
 export async function initializeServices() {
   let ipfs = null;
   let blockchain = null;
-  
+
   try {
     // Try to start IPFS, but don't stop if it fails
     ipfs = await startIPFSNode();
   } catch (error) {
     console.error('IPFS initialization failed, continuing without IPFS:', error);
   }
-  
+
   try {
     // Try to start blockchain, but don't stop if it fails
     blockchain = await startBlockchain();
   } catch (error) {
     console.error('Blockchain initialization failed, continuing with mock data:', error);
   }
-  
+
   // Return whatever we managed to start
   return { ipfs, blockchain };
 }
