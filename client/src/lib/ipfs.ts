@@ -1,7 +1,7 @@
 // Initialize IPFS configuration
 const ipfsConfig = {
-  gateway: 'http://localhost:8080',
-  api: 'http://localhost:5001'
+  gateway: 'http://0.0.0.0:8080',
+  api: 'http://0.0.0.0:5001'
 };
 
 // Function to get IPFS status
