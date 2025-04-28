@@ -26,12 +26,28 @@ const LicensingABI = [
   "function revokeLicense(bytes32 licenseId) external returns (bool)"
 ];
 
-// Configure blockchain connection
+// Configure blockchain connection - ONLY USE LOCAL NETWORKS
 const blockchainConfig = {
   url: process.env.BLOCKCHAIN_URL || 'http://localhost:8545',
-  chainId: process.env.BLOCKCHAIN_CHAIN_ID ? parseInt(process.env.BLOCKCHAIN_CHAIN_ID) : 1337,
-  networkName: process.env.BLOCKCHAIN_NETWORK || 'Local Development Network'
+  chainId: process.env.BLOCKCHAIN_CHAIN_ID ? parseInt(process.env.BLOCKCHAIN_CHAIN_ID) : 1337, // 1337 is Ganache's default
+  networkName: process.env.BLOCKCHAIN_NETWORK || 'Local Development Network',
+  // Ensure we're never connecting to mainnet
+  isLocalOnly: true
 };
+
+// Safety check: prevent connecting to mainnet
+function validateLocalNetworkOnly(chainId: number) {
+  // Mainnet chain IDs to avoid
+  const MAINNET_CHAIN_IDS = [1, 137, 56, 43114, 42161, 10];
+  
+  if (MAINNET_CHAIN_IDS.includes(chainId)) {
+    console.error('SECURITY ERROR: Attempted to connect to mainnet (Chain ID: ' + chainId + ')');
+    console.error('This application is configured to use local development networks only');
+    throw new Error('Mainnet connection forbidden');
+  }
+  
+  return true;
+}
 
 // Contract addresses - would come from environment in production
 const contractAddresses = {
@@ -47,18 +63,28 @@ let connected = false;
 let networkInfo: any = { name: 'Unknown' };
 
 try {
+  // Validate chain ID before attempting to connect
+  validateLocalNetworkOnly(blockchainConfig.chainId);
+  
   // Attempt to connect to the blockchain network
   provider = new ethers.JsonRpcProvider(blockchainConfig.url, {
     chainId: blockchainConfig.chainId,
     name: blockchainConfig.networkName,
   });
   
+  console.log(`Attempting to connect to local blockchain at ${blockchainConfig.url} (Chain ID: ${blockchainConfig.chainId})`);
+  console.log('IMPORTANT: This application is configured for local development networks only');
+  
   // Try to get network info to verify connection
   provider.getNetwork()
     .then(network => {
-      connected = true;
-      networkInfo = network;
-      console.log(`Connected to blockchain network: ${network.name} (chainId: ${network.chainId})`);
+      // Safety check: Never connect to mainnet
+      if (validateLocalNetworkOnly(Number(network.chainId))) {
+        connected = true;
+        networkInfo = network;
+        console.log(`Connected to blockchain network: ${network.name} (chainId: ${network.chainId})`);
+        console.log('IMPORTANT: Using development/test network only, not mainnet');
+      }
     })
     .catch(err => {
       console.error('Failed to get network information:', err);
@@ -155,7 +181,10 @@ export async function registerIP(ipfsHash: string, metadata: any, ownerAddress: 
     }
   } catch (error) {
     console.error('Error registering IP on blockchain:', error);
-    throw new Error(`Failed to register IP on blockchain: ${error.message}`);
+    const errorMessage = error && typeof error === 'object' && 'message' in error
+      ? error.message
+      : 'Unknown error';
+    throw new Error(`Failed to register IP on blockchain: ${errorMessage}`);
   }
 }
 
