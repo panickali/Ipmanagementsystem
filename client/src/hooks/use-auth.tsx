@@ -8,20 +8,27 @@ import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type AuthContextType = {
+type LoginData = Pick<InsertUser, "username" | "password">;
+
+// Define the Auth Context Type explicitly for better error checking
+interface AuthContextValue {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
+  hasPermission: (permission: keyof SelectUser) => boolean;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
-};
+}
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const AuthContext = createContext<AuthContextType | null>(null);
-export function AuthProvider({ children }: { children: ReactNode }) {
+function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  
+  // User data query
   const {
     data: user,
     error,
@@ -31,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
@@ -52,9 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Register mutation
   const registerMutation = useMutation({
-    mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
+    mutationFn: async (userData: InsertUser) => {
+      const res = await apiRequest("POST", "/api/register", userData);
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
@@ -73,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/logout");
@@ -93,26 +103,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Admin helpers
+  const isAdmin = !!user && (user.role === 'admin' || user.role === 'superadmin');
+  const isSuperAdmin = !!user && user.role === 'superadmin';
+  
+  const hasPermission = (permission: keyof SelectUser): boolean => {
+    if (!user) return false;
+    if (user.role === 'superadmin') return true;
+    return !!user[permission];
+  };
+
+  // Create the context value object
+  const value: AuthContextValue = {
+    user: user ?? null,
+    isLoading,
+    error,
+    isAdmin,
+    isSuperAdmin,
+    hasPermission,
+    loginMutation,
+    logoutMutation,
+    registerMutation,
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user: user ?? null,
-        isLoading,
-        error,
-        loginMutation,
-        logoutMutation,
-        registerMutation,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
+
+export { AuthProvider, useAuth };
