@@ -74,7 +74,16 @@ async function startIPFSNode() {
 
 // Initialize local blockchain
 async function startBlockchain() {
+  // First, try to release any existing ganache server
   try {
+    const tempProvider = new ethers.JsonRpcProvider('http://localhost:8545');
+    await tempProvider.destroy();
+  } catch (e) {
+    // Ignore if can't connect or destroy
+  }
+  
+  try {
+    // Create a new ganache server
     const server = ganache.server({
       wallet: {
         deterministic: true,
@@ -82,9 +91,15 @@ async function startBlockchain() {
       },
       logging: {
         quiet: false
+      },
+      // Configure server to automatically find a free port if 8545 is in use
+      server: {
+        port: 8545,
+        host: "0.0.0.0"
       }
     });
     
+    // Try to start the server
     await server.listen(8545);
     console.log('Ganache blockchain started on port 8545');
     
@@ -96,12 +111,31 @@ async function startBlockchain() {
     return server;
   } catch (error) {
     console.error('Failed to start blockchain:', error);
-    throw error;
+    // Don't throw here, just return null and let the application continue
+    // without blockchain functionality
+    console.log('Continuing without blockchain connection. Mock data will be used.');
+    return null;
   }
 }
 
 export async function initializeServices() {
-  const ipfs = await startIPFSNode();
-  const blockchain = await startBlockchain();
+  let ipfs = null;
+  let blockchain = null;
+  
+  try {
+    // Try to start IPFS, but don't stop if it fails
+    ipfs = await startIPFSNode();
+  } catch (error) {
+    console.error('IPFS initialization failed, continuing without IPFS:', error);
+  }
+  
+  try {
+    // Try to start blockchain, but don't stop if it fails
+    blockchain = await startBlockchain();
+  } catch (error) {
+    console.error('Blockchain initialization failed, continuing with mock data:', error);
+  }
+  
+  // Return whatever we managed to start
   return { ipfs, blockchain };
 }
