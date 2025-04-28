@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Dev Application service with hot reloading
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - ipfs
+      - ganache
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://${PGUSER}:${PGPASSWORD}@postgres:5432/${PGDATABASE}
+      - IPFS_API_URL=http://ipfs:5001
+      - IPFS_GATEWAY_URL=http://ipfs:8080
+      - BLOCKCHAIN_NODE_URL=http://ganache:8545
+      - SESSION_SECRET=${SESSION_SECRET:-ipchain_dev_session_secret}
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - app-network
+    restart: unless-stopped
+    command: npm run dev
+
+  # PostgreSQL database service (same as production)
+  postgres:
+    image: postgres:14-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=${PGPASSWORD}
+      - POSTGRES_USER=${PGUSER}
+      - POSTGRES_DB=${PGDATABASE}
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # IPFS node service (same as production)
+  ipfs:
+    image: ipfs/kubo:latest
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8080:8080"
+    volumes:
+      - ipfs-dev-data:/data/ipfs
+      - ipfs-dev-staging:/export
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Local Ethereum blockchain with deterministic addresses for development
+  ganache:
+    image: trufflesuite/ganache:latest
+    ports:
+      - "8545:8545"
+    volumes:
+      - blockchain-dev-data:/data
+    command: --mnemonic "hour turn beyond crime drift electric flush solid retire soft fabric surface" --db /data
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  postgres-dev-data:
+  ipfs-dev-data:
+  ipfs-dev-staging:
+  blockchain-dev-data:
+
+networks:
+  app-network:
+    driver: bridge
