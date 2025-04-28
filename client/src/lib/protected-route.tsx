@@ -15,47 +15,59 @@ export function ProtectedRoute({
   requiredPermission?: string;
 }) {
   const { user, isLoading, isAdmin, hasPermission } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    // If not loading and user is not authenticated, redirect to auth page
-    if (!isLoading && !user) {
+    if (isLoading) return; // Don't redirect while loading
+    
+    // If user is not authenticated, redirect to auth page
+    if (!user) {
+      console.log("Not authenticated, redirecting to /auth");
       setLocation("/auth");
       return;
     }
 
     // If admin-only route but user is not admin, redirect to home
-    if (!isLoading && user && adminOnly && !isAdmin) {
+    if (user && adminOnly && !isAdmin) {
+      console.log("Not admin, redirecting to /");
       setLocation("/");
       return;
     }
 
     // If route requires specific permission but user doesn't have it, redirect to home
-    if (!isLoading && user && requiredPermission && !hasPermission(requiredPermission as any)) {
+    if (user && requiredPermission && !hasPermission(requiredPermission as any)) {
+      console.log(`Missing permission ${requiredPermission}, redirecting to /`);
       setLocation("/");
       return;
     }
-  }, [user, isLoading, isAdmin, hasPermission, setLocation, adminOnly, requiredPermission]);
+  }, [user, isLoading, isAdmin, hasPermission, setLocation, adminOnly, requiredPermission, location]);
 
+  // Show loading state while authentication is being checked
   if (isLoading) {
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-border" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </Route>
     );
   }
 
-  // Create wrapper component with permission checking
-  const RouteComponent = (props: any) => {
-    // Only render if all conditions are met
-    if (!user) return null; 
-    if (adminOnly && !isAdmin) return null;
-    if (requiredPermission && !hasPermission(requiredPermission as any)) return null;
-    
-    return <Component {...props} />;
-  };
+  // If not authenticated, don't render anything (will redirect in useEffect)
+  if (!user) {
+    return <Route path={path}><div /></Route>;
+  }
 
-  return <Route path={path} component={RouteComponent} />;
+  // If admin check fails, don't render anything (will redirect in useEffect)
+  if (adminOnly && !isAdmin) {
+    return <Route path={path}><div /></Route>;
+  }
+
+  // If permission check fails, don't render anything (will redirect in useEffect)
+  if (requiredPermission && !hasPermission(requiredPermission as any)) {
+    return <Route path={path}><div /></Route>;
+  }
+
+  // If all checks pass, render the component
+  return <Route path={path} component={Component} />;
 }

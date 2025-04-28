@@ -87,24 +87,39 @@ const AuthPage = () => {
     },
   });
   
-  // Try to get auth context
-  let user = null;
-  let loginMutation = null;
-  let registerMutation = null;
-  
-  try {
-    const auth = useAuth();
-    user = auth.user;
-    loginMutation = auth.loginMutation;
-    registerMutation = auth.registerMutation;
-  } catch (error) {
-    console.error("Auth context error:", error);
-    setAuthError(true);
-  }
+  // Get auth context
+  const { 
+    user, 
+    isLoading, 
+    loginMutation, 
+    registerMutation 
+  } = useAuth();
 
-  // Redirect if already logged in
+  // After successful login/register, redirect to home
+  useEffect(() => {
+    if (user) {
+      console.log("User authenticated, redirecting to /");
+      window.location.href = "/"; // Force full page navigation
+    }
+  }, [user]);
+  
+  // Show loading spinner during authentication check
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  // Don't render the login form if user is already authenticated
   if (user) {
-    return <Redirect to="/" />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Redirecting...</span>
+      </div>
+    );
   }
   
   // Show error UI if auth context failed

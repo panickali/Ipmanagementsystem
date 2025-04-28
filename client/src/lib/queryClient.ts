@@ -16,7 +16,8 @@ export async function apiRequest(
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials: "include", // This ensures cookies are sent with requests
+    cache: "no-cache", // Prevent caching to ensure fresh data
   });
 
   await throwIfResNotOk(res);
@@ -30,7 +31,12 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
+      credentials: "include", // Include cookies
+      cache: "no-cache", // Prevent caching
+      headers: {
+        "Pragma": "no-cache",
+        "Cache-Control": "no-cache"
+      }
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

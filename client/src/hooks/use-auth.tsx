@@ -33,9 +33,13 @@ function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch: refetchUser
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    staleTime: 0, // Don't cache this query to ensure fresh data
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    retry: 1, // Retry once in case of network issues
   });
 
   // Login mutation
@@ -45,11 +49,20 @@ function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
+      // Invalidate and refetch user data after login
       queryClient.setQueryData(["/api/user"], user);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      refetchUser(); // Force immediate refetch
+      
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.name}!`,
       });
+      
+      // Redirect after successful login
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -67,11 +80,20 @@ function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
+      // Update cache and refetch
       queryClient.setQueryData(["/api/user"], user);
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      refetchUser(); // Force immediate refetch
+      
       toast({
         title: "Registration successful",
         description: `Welcome, ${user.name}!`,
       });
+      
+      // Redirect after successful registration
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
