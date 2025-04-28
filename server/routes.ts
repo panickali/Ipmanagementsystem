@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { setupAuth } from "./auth";
+import { setupAuth, hashPassword } from "./auth";
 import { uploadToIPFS, checkIPFSStatus } from "./ipfs";
 import blockchain, { checkBlockchainStatus } from "./blockchain";
 import { db } from "./db";
@@ -406,6 +406,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Personal data deletion request submitted" });
     } catch (error) {
       res.status(500).json({ message: "Failed to process GDPR request" });
+    }
+  });
+  
+  // Admin routes
+  // Get all users (admin only)
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Remove passwords before sending
+      const usersWithoutPasswords = users.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+  
+  // Update user permissions (admin only)
+  app.patch("/api/admin/users/:userId/permissions", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check if current user is admin or superadmin
+      const isSuperAdmin = req.user!.role === 'superadmin';
+      
+      // Only superadmin can modify admin accounts
+      if ((user.role === 'admin' || user.role === 'superadmin') && !isSuperAdmin) {
+        return res.status(403).json({ 
+          message: "Only superadmins can modify admin permissions" 
+        });
+      }
+      
+      // Update user permissions
+      const updatedUser = await storage.updateUser(userId, req.body);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Remove password before sending response
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user permissions:", error);
+      res.status(500).json({ message: "Failed to update user permissions" });
+    }
+  });
+  
+  // Get all IP assets (admin only)
+  app.get("/api/admin/ip-assets", isAdmin, async (req, res) => {
+    try {
+      // In a real implementation, this would fetch all IP assets with pagination
+      const assets = [];
+      
+      // For now, let's return a placeholder until we implement proper admin IP asset listing
+      res.json(assets);
+    } catch (error) {
+      console.error("Error fetching all IP assets:", error);
+      res.status(500).json({ message: "Failed to fetch IP assets" });
+    }
+  });
+  
+  // Verify IP asset (admin with verification rights only)
+  app.patch("/api/admin/ip-assets/:id/verify", isAdmin, async (req, res) => {
+    try {
+      const assetId = parseInt(req.params.id);
+      const asset = await storage.getIPAsset(assetId);
+      
+      if (!asset) {
+        return res.status(404).json({ message: "IP asset not found" });
+      }
+      
+      // Check if user has verification rights
+      if (!req.user!.canVerifyAssets && req.user!.role !== 'superadmin') {
+        return res.status(403).json({ 
+          message: "You don't have permission to verify IP assets" 
+        });
+      }
+      
+      // Update asset status
+      const { status } = req.body;
+      if (!status || !['pending', 'verified', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      
+      const updatedAsset = await storage.updateIPAsset(assetId, { status: status as any });
+      res.json(updatedAsset);
+    } catch (error) {
+      console.error("Error verifying IP asset:", error);
+      res.status(500).json({ message: "Failed to verify IP asset" });
+    }
+  });
+  
+  // System configuration routes (superadmin only)
+  app.get("/api/admin/system/config", isSuperAdmin, async (req, res) => {
+    try {
+      // In a real implementation, this would fetch system configuration
+      // including blockchain settings, IPFS settings, etc.
+      res.json({
+        blockchain: {
+          networkId: 1,
+          nodeUrl: "https://ethereum.example.com",
+          contracts: blockchain.getContractAddresses()
+        },
+        ipfs: {
+          gateway: "https://ipfs.example.com",
+          apiUrl: "https://ipfs-api.example.com"
+        },
+        security: {
+          defaultUserRole: "user",
+          maxFailedLoginAttempts: 5,
+          accountLockDuration: 30 // minutes
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching system config:", error);
+      res.status(500).json({ message: "Failed to fetch system configuration" });
+    }
+  });
+  
+  // Create new user (admin only)
+  app.post("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const { username, password, email, name, role } = req.body;
+      
+      if (!username || !password || !email || !name) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      // Check if current user is superadmin or trying to create an admin account
+      const isSuperAdmin = req.user!.role === 'superadmin';
+      if ((role === 'admin' || role === 'superadmin') && !isSuperAdmin) {
+        return res.status(403).json({ 
+          message: "Only superadmins can create admin accounts" 
+        });
+      }
+      
+      // Check if username or email already exists
+      const existingUser = await storage.getUserByUsername(username) || 
+                           await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ message: "Username or email already exists" });
+      }
+      
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+      
+      // Create new user
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        email,
+        name,
+        role: role || 'user',
+        isHighPriority: req.body.isHighPriority || false,
+        canVerifyAssets: req.body.canVerifyAssets || false,
+        canManageUsers: req.body.canManageUsers || false,
+        canApproveTransfers: req.body.canApproveTransfers || false,
+        canEditAccessRights: req.body.canEditAccessRights || false,
+        gdprAccessLevel: req.body.gdprAccessLevel || 1
+      });
+      
+      // Remove password before sending response
+      const { password: _, ...userWithoutPassword } = newUser;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating new user:", error);
+      res.status(500).json({ message: "Failed to create new user" });
     }
   });
 
