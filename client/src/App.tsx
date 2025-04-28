@@ -19,12 +19,23 @@ function Router() {
   );
 }
 
+// This is a separate AuthWrapper component to ensure proper context usage
+function AuthWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+      {children}
+    </AuthProvider>
+  );
+}
+
 function App() {
   return (
     <TooltipProvider>
       <Toaster />
-      {/* The AuthProvider is already included in main.tsx, but we'll add error boundaries here */}
-      <Router />
+      {/* We are adding AuthProvider here and removing from main.tsx to prevent nested providers */}
+      <AuthWrapper>
+        <Router />
+      </AuthWrapper>
     </TooltipProvider>
   );
 }

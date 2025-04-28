@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -42,10 +41,34 @@ const registerSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-const AuthPage = () => {
-  const { user, loginMutation, registerMutation } = useAuth();
+interface FeatureProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}
 
-  // Login form setup
+const Feature = ({ icon, title, description }: FeatureProps) => (
+  <div className="flex items-start">
+    <div className="flex-shrink-0 bg-white/10 p-2 rounded-lg mr-4">
+      {icon}
+    </div>
+    <div>
+      <h3 className="text-xl font-semibold mb-1">{title}</h3>
+      <p className="text-white/80">{description}</p>
+    </div>
+  </div>
+);
+
+const AuthPage = () => {
+  // Set page title
+  useEffect(() => {
+    document.title = "Login | IP Chain";
+  }, []);
+  
+  // State to track auth errors
+  const [authError, setAuthError] = useState(false);
+  
+  // Setup forms first
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -54,7 +77,6 @@ const AuthPage = () => {
     },
   });
 
-  // Registration form setup
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -64,27 +86,62 @@ const AuthPage = () => {
       password: "",
     },
   });
-
-  const onLoginSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate(data);
-  };
-
-  const onRegisterSubmit = (data: RegisterFormValues) => {
-    registerMutation.mutate({
-      ...data,
-      role: "user", // Default role
-    });
-  };
-
-  useEffect(() => {
-    document.title = "Login | IP Chain";
-  }, []);
+  
+  // Try to get auth context
+  let user = null;
+  let loginMutation = null;
+  let registerMutation = null;
+  
+  try {
+    const auth = useAuth();
+    user = auth.user;
+    loginMutation = auth.loginMutation;
+    registerMutation = auth.registerMutation;
+  } catch (error) {
+    console.error("Auth context error:", error);
+    setAuthError(true);
+  }
 
   // Redirect if already logged in
   if (user) {
     return <Redirect to="/" />;
   }
+  
+  // Show error UI if auth context failed
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-4">
+        <div className="bg-white p-6 rounded-lg shadow-md max-w-md w-full text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-4">Authentication Error</h2>
+          <p className="mb-4">There was a problem loading the authentication service. Please try refreshing the page.</p>
+          <Button 
+            onClick={() => window.location.reload()}
+            className="bg-primary hover:bg-primary-dark"
+          >
+            Refresh Page
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  
+  // Define submission handlers
+  const onLoginSubmit = (data: LoginFormValues) => {
+    if (loginMutation) {
+      loginMutation.mutate(data);
+    }
+  };
 
+  const onRegisterSubmit = (data: RegisterFormValues) => {
+    if (registerMutation) {
+      registerMutation.mutate({
+        ...data,
+        role: "user", // Default role
+      });
+    }
+  };
+
+  // Main auth UI
   return (
     <div className="min-h-screen bg-neutral-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl w-full flex flex-col lg:flex-row gap-8">
@@ -148,9 +205,9 @@ const AuthPage = () => {
                         <Button 
                           type="submit" 
                           className="w-full bg-primary hover:bg-primary-dark"
-                          disabled={loginMutation.isPending}
+                          disabled={loginMutation?.isPending}
                         >
-                          {loginMutation.isPending ? (
+                          {loginMutation?.isPending ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                               Signing in...
@@ -243,9 +300,9 @@ const AuthPage = () => {
                         <Button 
                           type="submit" 
                           className="w-full bg-primary hover:bg-primary-dark"
-                          disabled={registerMutation.isPending}
+                          disabled={registerMutation?.isPending}
                         >
-                          {registerMutation.isPending ? (
+                          {registerMutation?.isPending ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                               Creating account...
@@ -292,23 +349,5 @@ const AuthPage = () => {
     </div>
   );
 };
-
-interface FeatureProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}
-
-const Feature = ({ icon, title, description }: FeatureProps) => (
-  <div className="flex items-start">
-    <div className="flex-shrink-0 bg-white/10 p-2 rounded-lg mr-4">
-      {icon}
-    </div>
-    <div>
-      <h3 className="text-xl font-semibold mb-1">{title}</h3>
-      <p className="text-white/80">{description}</p>
-    </div>
-  </div>
-);
 
 export default AuthPage;
