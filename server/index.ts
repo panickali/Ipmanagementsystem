@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initializeServices } from './setup'; // Added import for service initialization
 
 const app = express();
 app.use(express.json());
@@ -37,6 +38,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await initializeServices(); // Initialize IPFS and blockchain services
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -68,3 +70,26 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
   });
 })();
+
+
+// setup.ts
+import { create } from 'ipfs-http-client';
+import Ganache from 'ganache-cli';
+
+export async function initializeServices() {
+  try {
+    // Initialize IPFS
+    const ipfs = create({ host: 'localhost', port: 5001, protocol: 'http' });
+    console.log('IPFS node initialized:', await ipfs.id());
+
+    // Initialize Ganache (local blockchain)
+    const ganacheServer = Ganache.server();
+    await ganacheServer.listen(8545);
+    console.log('Ganache server started on port 8545');
+
+
+  } catch (error) {
+    console.error('Error initializing services:', error);
+    throw error; // Re-throw the error to halt the server startup
+  }
+}
