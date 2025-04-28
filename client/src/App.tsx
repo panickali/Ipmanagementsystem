@@ -1,3 +1,4 @@
+
 import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,24 +20,14 @@ function Router() {
   );
 }
 
-// This is a separate AuthWrapper component to ensure proper context usage
-function AuthWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      {children}
-    </AuthProvider>
-  );
-}
-
 function App() {
   return (
-    <TooltipProvider>
-      <Toaster />
-      {/* We are adding AuthProvider here and removing from main.tsx to prevent nested providers */}
-      <AuthWrapper>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
         <Router />
-      </AuthWrapper>
-    </TooltipProvider>
+      </TooltipProvider>
+    </AuthProvider>
   );
 }
 
