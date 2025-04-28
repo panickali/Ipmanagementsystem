@@ -45,6 +45,22 @@ async function checkDatabaseConnection() {
   }
 }
 
+// Check if user is admin
+function isAdmin(req: Request, res: Response, next: Function) {
+  if (req.isAuthenticated() && req.user && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
+    return next();
+  }
+  res.status(403).json({ message: "Forbidden: Admin access required" });
+}
+
+// Check if user is superadmin
+function isSuperAdmin(req: Request, res: Response, next: Function) {
+  if (req.isAuthenticated() && req.user && req.user.role === 'superadmin') {
+    return next();
+  }
+  res.status(403).json({ message: "Forbidden: SuperAdmin access required" });
+}
+
 // Health check endpoint function
 async function healthCheck(req: Request, res: Response) {
     try {

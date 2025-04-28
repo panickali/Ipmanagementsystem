@@ -21,7 +21,7 @@ import {
 
 const AppHeader = () => {
   const [location] = useLocation();
-  const { user, logoutMutation } = useAuth();
+  const { user, logoutMutation, isAdmin } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -105,6 +105,14 @@ const AppHeader = () => {
                       <HelpCircle className="mr-2 h-4 w-4" />
                       <span>Help</span>
                     </DropdownMenuItem>
+                    {isAdmin && (
+                      <Link href="/admin">
+                        <DropdownMenuItem>
+                          <Settings className="mr-2 h-4 w-4" />
+                          <span>Admin Dashboard</span>
+                        </DropdownMenuItem>
+                      </Link>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
@@ -183,6 +191,18 @@ const AppHeader = () => {
               >
                 Settings
               </Button>
+              
+              {isAdmin && (
+                <Link href="/admin">
+                  <Button
+                    variant="ghost"
+                    className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-white hover:bg-primary-light"
+                  >
+                    Admin Dashboard
+                  </Button>
+                </Link>
+              )}
+              
               <Button
                 variant="ghost"
                 className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-white hover:bg-primary-light"
