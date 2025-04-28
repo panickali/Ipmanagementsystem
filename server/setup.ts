@@ -9,12 +9,32 @@ import path from 'path';
 function cleanupIPFSLock() {
   try {
     const repoLockPath = path.join('.ipfs', 'repo.lock');
+    
     if (fs.existsSync(repoLockPath)) {
       console.log('Removing stale IPFS repo lock...');
-      fs.unlinkSync(repoLockPath);
+      const stats = fs.statSync(repoLockPath);
+      
+      if (stats.isDirectory()) {
+        // It's a directory, try to remove it recursively (but only if it's the lock directory)
+        if (repoLockPath.endsWith('repo.lock')) {
+          console.log('Lock is a directory, cleaning recursively...');
+          // This is a simplified approach - we're just going to remove the lock indicator files
+          const lockFiles = ['lock', 'LOCK', 'write.lock'];
+          for (const file of lockFiles) {
+            const filePath = path.join(repoLockPath, file);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+      } else {
+        // It's a file, just remove it
+        fs.unlinkSync(repoLockPath);
+      }
     }
   } catch (err) {
     console.warn('Error cleaning up IPFS lock:', err);
+    // Continue anyway
   }
 }
 
