@@ -2,8 +2,15 @@ import { users, ipAssets, ownershipTransfers, licenseAgreements } from "@shared/
 import type { User, InsertUser, IPAsset, InsertIPAsset, OwnershipTransfer, InsertOwnershipTransfer, LicenseAgreement, InsertLicenseAgreement } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { db, pool } from "./db";
+import { eq, and, desc } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
+
+// Define SessionStore type since it's not exported from express-session
+type SessionStore = ReturnType<typeof createMemoryStore>;
 
 // Storage interface
 export interface IStorage {
@@ -45,7 +52,7 @@ export interface IStorage {
   }>;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: SessionStore;
 }
 
 // In-memory storage implementation
@@ -55,7 +62,7 @@ export class MemStorage implements IStorage {
   private ownershipTransfers: Map<number, OwnershipTransfer>;
   private licenseAgreements: Map<number, LicenseAgreement>;
   
-  sessionStore: session.SessionStore;
+  sessionStore: SessionStore;
   
   currentUserId: number;
   currentAssetId: number;
@@ -98,7 +105,19 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
     const createdAt = new Date();
-    const user: User = { ...insertUser, id, createdAt };
+    const user: User = { 
+      ...insertUser, 
+      id, 
+      createdAt,
+      role: insertUser.role || "user",
+      isHighPriority: insertUser.isHighPriority || false,
+      canVerifyAssets: insertUser.canVerifyAssets || false,
+      canManageUsers: insertUser.canManageUsers || false,
+      canApproveTransfers: insertUser.canApproveTransfers || false,
+      canEditAccessRights: insertUser.canEditAccessRights || false,
+      gdprAccessLevel: insertUser.gdprAccessLevel || 0,
+      lastLogin: null
+    };
     this.users.set(id, user);
     return user;
   }
@@ -144,7 +163,9 @@ export class MemStorage implements IStorage {
       ...asset, 
       id, 
       registrationDate, 
-      lastUpdated 
+      lastUpdated,
+      status: asset.status || "pending",
+      blockchainTxHash: asset.blockchainTxHash || null
     };
     this.ipAssets.set(id, newAsset);
     return newAsset;
@@ -183,7 +204,13 @@ export class MemStorage implements IStorage {
   async createTransfer(transfer: InsertOwnershipTransfer): Promise<OwnershipTransfer> {
     const id = this.currentTransferId++;
     const transferDate = new Date();
-    const newTransfer: OwnershipTransfer = { ...transfer, id, transferDate };
+    const newTransfer: OwnershipTransfer = { 
+      ...transfer, 
+      id, 
+      transferDate,
+      status: transfer.status || "pending",
+      blockchainTxHash: transfer.blockchainTxHash || null
+    };
     this.ownershipTransfers.set(id, newTransfer);
     return newTransfer;
   }
@@ -266,4 +293,216 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database storage implementation
+export class DatabaseStorage implements IStorage {
+  sessionStore: SessionStore;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({ 
+      pool,
+      createTableIfMissing: true 
+    });
+  }
+  
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+  
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+  
+  async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+  
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+  
+  // IP Asset methods
+  async getIPAsset(id: number): Promise<IPAsset | undefined> {
+    const [asset] = await db.select().from(ipAssets).where(eq(ipAssets.id, id));
+    return asset;
+  }
+  
+  async getIPAssetsByOwner(ownerId: number): Promise<IPAsset[]> {
+    return await db.select().from(ipAssets).where(eq(ipAssets.ownerId, ownerId));
+  }
+  
+  async getIPAssetByIPFSHash(ipfsHash: string): Promise<IPAsset | undefined> {
+    const [asset] = await db.select().from(ipAssets).where(eq(ipAssets.ipfsHash, ipfsHash));
+    return asset;
+  }
+  
+  async createIPAsset(asset: InsertIPAsset): Promise<IPAsset> {
+    const now = new Date();
+    const [newAsset] = await db
+      .insert(ipAssets)
+      .values({
+        ...asset,
+        registrationDate: now,
+        lastUpdated: now
+      })
+      .returning();
+    return newAsset;
+  }
+  
+  async updateIPAsset(id: number, asset: Partial<IPAsset>): Promise<IPAsset | undefined> {
+    const [updatedAsset] = await db
+      .update(ipAssets)
+      .set({
+        ...asset,
+        lastUpdated: new Date()
+      })
+      .where(eq(ipAssets.id, id))
+      .returning();
+    return updatedAsset;
+  }
+  
+  async deleteIPAsset(id: number): Promise<boolean> {
+    const [deletedAsset] = await db
+      .delete(ipAssets)
+      .where(eq(ipAssets.id, id))
+      .returning();
+    return !!deletedAsset;
+  }
+  
+  // Ownership Transfer methods
+  async getTransfer(id: number): Promise<OwnershipTransfer | undefined> {
+    const [transfer] = await db.select().from(ownershipTransfers).where(eq(ownershipTransfers.id, id));
+    return transfer;
+  }
+  
+  async getPendingTransfersByUser(userId: number): Promise<OwnershipTransfer[]> {
+    return await db
+      .select()
+      .from(ownershipTransfers)
+      .where(
+        and(
+          eq(ownershipTransfers.status, "pending"),
+          eq(ownershipTransfers.toUserId, userId)
+        )
+      );
+  }
+  
+  async createTransfer(transfer: InsertOwnershipTransfer): Promise<OwnershipTransfer> {
+    const [newTransfer] = await db
+      .insert(ownershipTransfers)
+      .values({
+        ...transfer,
+        transferDate: new Date()
+      })
+      .returning();
+    return newTransfer;
+  }
+  
+  async updateTransfer(id: number, transfer: Partial<OwnershipTransfer>): Promise<OwnershipTransfer | undefined> {
+    const [updatedTransfer] = await db
+      .update(ownershipTransfers)
+      .set(transfer)
+      .where(eq(ownershipTransfers.id, id))
+      .returning();
+    return updatedTransfer;
+  }
+  
+  // License Agreement methods
+  async getLicense(id: number): Promise<LicenseAgreement | undefined> {
+    const [license] = await db.select().from(licenseAgreements).where(eq(licenseAgreements.id, id));
+    return license;
+  }
+  
+  async getLicensesByIPAsset(ipAssetId: number): Promise<LicenseAgreement[]> {
+    return await db.select().from(licenseAgreements).where(eq(licenseAgreements.ipAssetId, ipAssetId));
+  }
+  
+  async getLicensesByLicenser(licenserId: number): Promise<LicenseAgreement[]> {
+    return await db.select().from(licenseAgreements).where(eq(licenseAgreements.licenserId, licenserId));
+  }
+  
+  async createLicense(license: InsertLicenseAgreement): Promise<LicenseAgreement> {
+    const [newLicense] = await db
+      .insert(licenseAgreements)
+      .values({
+        ...license,
+        createdAt: new Date()
+      })
+      .returning();
+    return newLicense;
+  }
+  
+  async updateLicense(id: number, license: Partial<LicenseAgreement>): Promise<LicenseAgreement | undefined> {
+    const [updatedLicense] = await db
+      .update(licenseAgreements)
+      .set(license)
+      .where(eq(licenseAgreements.id, id))
+      .returning();
+    return updatedLicense;
+  }
+  
+  // Stats methods
+  async getStats(userId: number): Promise<{
+    totalAssets: number;
+    verifiedAssets: number;
+    pendingTransfers: number;
+    activeLicenses: number;
+  }> {
+    // Total assets
+    const userAssets = await this.getIPAssetsByOwner(userId);
+    const totalAssets = userAssets.length;
+    
+    // Verified assets
+    const verifiedAssets = userAssets.filter(asset => asset.status === "verified").length;
+    
+    // Pending transfers
+    const pendingTransfers = await db
+      .select()
+      .from(ownershipTransfers)
+      .where(
+        and(
+          eq(ownershipTransfers.status, "pending"),
+          eq(ownershipTransfers.toUserId, userId)
+        )
+      )
+      .then(results => results.length);
+    
+    // Active licenses
+    const now = new Date();
+    const userLicenses = await this.getLicensesByLicenser(userId);
+    const activeLicenses = userLicenses.filter(license => 
+      license.status === "verified" && 
+      (!license.endDate || license.endDate > now)
+    ).length;
+    
+    return {
+      totalAssets,
+      verifiedAssets,
+      pendingTransfers,
+      activeLicenses
+    };
+  }
+}
+
+// Use database storage
+export const storage = new DatabaseStorage();

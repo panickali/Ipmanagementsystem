@@ -70,26 +70,3 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
   });
 })();
-
-
-// setup.ts
-import { create } from 'ipfs-http-client';
-import Ganache from 'ganache-cli';
-
-export async function initializeServices() {
-  try {
-    // Initialize IPFS
-    const ipfs = create({ host: 'localhost', port: 5001, protocol: 'http' });
-    console.log('IPFS node initialized:', await ipfs.id());
-
-    // Initialize Ganache (local blockchain)
-    const ganacheServer = Ganache.server();
-    await ganacheServer.listen(8545);
-    console.log('Ganache server started on port 8545');
-
-
-  } catch (error) {
-    console.error('Error initializing services:', error);
-    throw error; // Re-throw the error to halt the server startup
-  }
-}
