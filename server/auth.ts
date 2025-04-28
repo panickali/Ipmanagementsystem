@@ -37,8 +37,9 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 1000 * 60 * 60 * 24, // 24 hours
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax"
+      secure: false, // Set to false for development, process.env.NODE_ENV === "production" for production
+      sameSite: "lax",
+      path: "/"
     }
   };
 
@@ -186,32 +187,46 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), async (req, res) => {
-    if (req.user) {
-      try {
-        // Update last login timestamp
-        if (req.user.id) {
-          await storage.updateUser(req.user.id, { 
-            lastLogin: new Date() 
-          });
-        }
-        
-        // Don't send password back to client
-        const { password, ...userWithoutPassword } = req.user;
-        
-        // Log high priority admin logins
-        if (req.user.isHighPriority || req.user.role === 'admin' || req.user.role === 'superadmin') {
-          console.log(`High priority user logged in: ${req.user.username} (${req.user.role})`);
-        }
-        
-        res.status(200).json(userWithoutPassword);
-      } catch (error) {
-        console.error("Error during login:", error);
-        res.status(200).json(req.user); // Still return user but without updating last login
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate("local", (err, user, info) => {
+      if (err) {
+        return next(err);
       }
-    } else {
-      res.status(401).json({ message: "Authentication failed" });
-    }
+      if (!user) {
+        return res.status(401).json({ message: "Authentication failed" });
+      }
+      
+      // Log in the user
+      req.login(user, async (loginErr) => {
+        if (loginErr) {
+          return next(loginErr);
+        }
+        
+        try {
+          // Update last login timestamp
+          if (user.id) {
+            await storage.updateUser(user.id, { 
+              lastLogin: new Date() 
+            });
+          }
+          
+          // Don't send password back to client
+          const { password, ...userWithoutPassword } = user;
+          
+          // Log high priority admin logins
+          if (user.isHighPriority || user.role === 'admin' || user.role === 'superadmin') {
+            console.log(`High priority user logged in: ${user.username} (${user.role})`);
+          }
+          
+          res.status(200).json(userWithoutPassword);
+        } catch (error) {
+          console.error("Error during login:", error);
+          // Still return user but without updating last login
+          const { password, ...userWithoutPassword } = user;
+          res.status(200).json(userWithoutPassword);
+        }
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
