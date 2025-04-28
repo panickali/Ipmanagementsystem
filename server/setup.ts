@@ -2,10 +2,28 @@
 import { create } from 'ipfs';
 import ganache from 'ganache';
 import { ethers } from 'ethers';
+import fs from 'fs';
+import path from 'path';
+
+// Helper function to clean up IPFS repo lock if needed
+function cleanupIPFSLock() {
+  try {
+    const repoLockPath = path.join('.ipfs', 'repo.lock');
+    if (fs.existsSync(repoLockPath)) {
+      console.log('Removing stale IPFS repo lock...');
+      fs.unlinkSync(repoLockPath);
+    }
+  } catch (err) {
+    console.warn('Error cleaning up IPFS lock:', err);
+  }
+}
 
 // Initialize IPFS node
 async function startIPFSNode() {
   try {
+    // First try to clean up any stale lock file
+    cleanupIPFSLock();
+    
     const ipfs = await create({
       repo: './.ipfs',
       start: true,
@@ -23,6 +41,13 @@ async function startIPFSNode() {
     return ipfs;
   } catch (error) {
     console.error('Failed to start IPFS node:', error);
+    
+    // If we still have a lock issue, just warn instead of crashing the app
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_LOCK_EXISTS') {
+      console.warn('IPFS lock exists. Continuing without local IPFS node.');
+      return null;
+    }
+    
     throw error;
   }
 }

@@ -2,24 +2,15 @@ import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "driz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User role enum
-export const userRoleEnum = pgEnum("user_role", ["user", "admin", "superadmin"]);
-
-// User model
+// We'll use string for role instead of enum to match the existing database
+// User model - adapted to match existing database structure
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  role: userRoleEnum("role").notNull().default("user"),
-  isHighPriority: boolean("is_high_priority").default(false).notNull(),
-  canVerifyAssets: boolean("can_verify_assets").default(false).notNull(),
-  canManageUsers: boolean("can_manage_users").default(false).notNull(),
-  canApproveTransfers: boolean("can_approve_transfers").default(false).notNull(),
-  canEditAccessRights: boolean("can_edit_access_rights").default(false).notNull(),
-  gdprAccessLevel: integer("gdpr_access_level").default(0).notNull(), // 0: Normal, 1: Restricted, 2: Full access
-  lastLogin: timestamp("last_login"),
+  role: text("role").notNull().default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -86,19 +77,13 @@ export const licenseAgreements = pgTable("license_agreements", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Insert schemas
+// Insert schemas - simplified to match the existing database
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
   name: true,
   email: true,
   role: true,
-  isHighPriority: true,
-  canVerifyAssets: true,
-  canManageUsers: true,
-  canApproveTransfers: true,
-  canEditAccessRights: true,
-  gdprAccessLevel: true,
 });
 
 export const insertIPAssetSchema = createInsertSchema(ipAssets).pick({

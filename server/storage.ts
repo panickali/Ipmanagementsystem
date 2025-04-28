@@ -109,14 +109,7 @@ export class MemStorage implements IStorage {
       ...insertUser, 
       id, 
       createdAt,
-      role: insertUser.role || "user",
-      isHighPriority: insertUser.isHighPriority || false,
-      canVerifyAssets: insertUser.canVerifyAssets || false,
-      canManageUsers: insertUser.canManageUsers || false,
-      canApproveTransfers: insertUser.canApproveTransfers || false,
-      canEditAccessRights: insertUser.canEditAccessRights || false,
-      gdprAccessLevel: insertUser.gdprAccessLevel || 0,
-      lastLogin: null
+      role: insertUser.role || "user"
     };
     this.users.set(id, user);
     return user;
@@ -247,7 +240,14 @@ export class MemStorage implements IStorage {
   async createLicense(license: InsertLicenseAgreement): Promise<LicenseAgreement> {
     const id = this.currentLicenseId++;
     const createdAt = new Date();
-    const newLicense: LicenseAgreement = { ...license, id, createdAt };
+    const newLicense: LicenseAgreement = { 
+      ...license, 
+      id, 
+      createdAt,
+      status: license.status || "pending",
+      blockchainTxHash: license.blockchainTxHash || null,
+      endDate: license.endDate || null
+    };
     this.licenseAgreements.set(id, newLicense);
     return newLicense;
   }

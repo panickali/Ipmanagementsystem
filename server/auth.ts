@@ -82,19 +82,13 @@ export function setupAuth(app: Express) {
       
       if (adminUsers.length === 0) {
         console.log('Creating default admin user...');
-        // Create default admin
+        // Create default admin with simplified schema
         await storage.createUser({
           username: 'admin',
           password: await hashPassword('admin123'), // This is just a default password
           name: 'System Administrator',
           email: 'admin@ipchain.example',
-          role: 'superadmin',
-          isHighPriority: true,
-          canVerifyAssets: true,
-          canManageUsers: true,
-          canApproveTransfers: true,
-          canEditAccessRights: true,
-          gdprAccessLevel: 2
+          role: 'superadmin'
         });
         console.log('Default admin user created. Username: admin, Password: admin123');
       }
@@ -113,13 +107,7 @@ export function setupAuth(app: Express) {
         password, 
         name, 
         email, 
-        role = "user",
-        isHighPriority = false,
-        canVerifyAssets = false,
-        canManageUsers = false,
-        canApproveTransfers = false,
-        canEditAccessRights = false,
-        gdprAccessLevel = 0
+        role = "user"
       } = req.body;
       
       if (!username || !password || !name || !email) {
@@ -147,18 +135,11 @@ export function setupAuth(app: Express) {
         });
       }
       
-      // Admin needs canManageUsers permission to create other admins
-      if (role === 'admin' && 
-          (!req.user?.canManageUsers && req.user?.role !== 'superadmin')) {
+      // Only superadmin can create admin/superadmin
+      if ((role === 'admin' || role === 'superadmin') && 
+          req.user?.role !== 'superadmin') {
         return res.status(403).json({ 
-          message: "You need 'canManageUsers' permission to create admin accounts" 
-        });
-      }
-      
-      // Only superadmin can create superadmin
-      if (role === 'superadmin' && req.user?.role !== 'superadmin') {
-        return res.status(403).json({ 
-          message: "Only superadmins can create superadmin accounts" 
+          message: "Only superadmins can create admin accounts" 
         });
       }
 
@@ -167,13 +148,7 @@ export function setupAuth(app: Express) {
         password: await hashPassword(password),
         name,
         email,
-        role,
-        isHighPriority,
-        canVerifyAssets,
-        canManageUsers,
-        canApproveTransfers,
-        canEditAccessRights,
-        gdprAccessLevel
+        role
       });
 
       req.login(user, (err) => {
@@ -188,7 +163,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         return next(err);
       }
@@ -203,19 +178,12 @@ export function setupAuth(app: Express) {
         }
         
         try {
-          // Update last login timestamp
-          if (user.id) {
-            await storage.updateUser(user.id, { 
-              lastLogin: new Date() 
-            });
-          }
-          
           // Don't send password back to client
           const { password, ...userWithoutPassword } = user;
           
-          // Log high priority admin logins
-          if (user.isHighPriority || user.role === 'admin' || user.role === 'superadmin') {
-            console.log(`High priority user logged in: ${user.username} (${user.role})`);
+          // Log admin logins
+          if (user.role === 'admin' || user.role === 'superadmin') {
+            console.log(`Admin user logged in: ${user.username} (${user.role})`);
           }
           
           res.status(200).json(userWithoutPassword);
@@ -256,27 +224,17 @@ export function setupAuth(app: Express) {
     next();
   };
   
-  // Middleware for checking specific permissions
-  const checkPermission = (permission: keyof SelectUser) => {
-    return (req: any, res: any, next: any) => {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-      
-      // SuperAdmin always has all permissions
-      if (req.user.role === 'superadmin') {
-        return next();
-      }
-      
-      // Check if user has the specific permission
-      if (!req.user[permission]) {
-        return res.status(403).json({ 
-          message: `Permission denied. You need '${permission}' permission to access this resource.` 
-        });
-      }
-      
-      next();
-    };
+  // Middleware for checking superadmin role
+  const requireSuperAdmin = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ message: "Superadmin access required" });
+    }
+    
+    next();
   };
   
   // Admin routes
@@ -316,9 +274,9 @@ export function setupAuth(app: Express) {
     }
   });
   
-  // Update user permissions (high-priority admin only)
-  app.patch("/api/admin/users/:id/permissions", 
-    checkPermission('canEditAccessRights'), 
+  // Update user role (superadmin only)
+  app.patch("/api/admin/users/:id/role", 
+    requireSuperAdmin,
     async (req, res, next) => {
       try {
         const userId = parseInt(req.params.id);
@@ -331,29 +289,26 @@ export function setupAuth(app: Express) {
           return res.status(404).json({ message: "User not found" });
         }
         
-        // Only superadmin can modify another admin's permissions
-        if ((user.role === 'admin' || user.role === 'superadmin') && 
-            req.user.role !== 'superadmin') {
-          return res.status(403).json({ 
-            message: "Only superadmins can modify admin permissions" 
+        // Make sure we have a valid role
+        const role = req.body.role;
+        if (!role || !['user', 'admin', 'superadmin'].includes(role)) {
+          return res.status(400).json({ 
+            message: "Invalid role. Must be 'user', 'admin', or 'superadmin'" 
           });
         }
         
-        // Update user permissions
-        const updatedUser = await storage.updateUser(userId, {
-          isHighPriority: req.body.isHighPriority !== undefined ? req.body.isHighPriority : user.isHighPriority,
-          canVerifyAssets: req.body.canVerifyAssets !== undefined ? req.body.canVerifyAssets : user.canVerifyAssets,
-          canManageUsers: req.body.canManageUsers !== undefined ? req.body.canManageUsers : user.canManageUsers,
-          canApproveTransfers: req.body.canApproveTransfers !== undefined ? req.body.canApproveTransfers : user.canApproveTransfers,
-          canEditAccessRights: req.body.canEditAccessRights !== undefined ? req.body.canEditAccessRights : user.canEditAccessRights,
-          gdprAccessLevel: req.body.gdprAccessLevel !== undefined ? req.body.gdprAccessLevel : user.gdprAccessLevel,
-        });
+        // Update user role
+        const updatedUser = await storage.updateUser(userId, { role });
+        
+        if (!updatedUser) {
+          return res.status(500).json({ message: "Failed to update user" });
+        }
         
         // Remove password from response
         const { password, ...userWithoutPassword } = updatedUser;
         
-        // Log the permission change
-        console.log(`User permissions updated for ${user.username} by ${req.user.username}`);
+        // Log the role change
+        console.log(`User role updated for ${user.username} to ${role} by ${req.user?.username || 'unknown'}`);
         
         res.json(userWithoutPassword);
       } catch (error) {
