@@ -6,6 +6,7 @@ import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import IPDetailsPage from "@/pages/ip-details-page";
 import { ProtectedRoute } from "./lib/protected-route";
+import { AuthProvider } from "./hooks/use-auth";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function App() {
   return (
     <TooltipProvider>
       <Toaster />
+      {/* The AuthProvider is already included in main.tsx, but we'll add error boundaries here */}
       <Router />
     </TooltipProvider>
   );
