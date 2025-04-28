@@ -2,6 +2,9 @@ import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "driz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// User role enum
+export const userRoleEnum = pgEnum("user_role", ["user", "admin", "superadmin"]);
+
 // User model
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -9,7 +12,14 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  role: text("role").notNull().default("user"),
+  role: userRoleEnum("role").notNull().default("user"),
+  isHighPriority: boolean("is_high_priority").default(false).notNull(),
+  canVerifyAssets: boolean("can_verify_assets").default(false).notNull(),
+  canManageUsers: boolean("can_manage_users").default(false).notNull(),
+  canApproveTransfers: boolean("can_approve_transfers").default(false).notNull(),
+  canEditAccessRights: boolean("can_edit_access_rights").default(false).notNull(),
+  gdprAccessLevel: integer("gdpr_access_level").default(0).notNull(), // 0: Normal, 1: Restricted, 2: Full access
+  lastLogin: timestamp("last_login"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -83,6 +93,12 @@ export const insertUserSchema = createInsertSchema(users).pick({
   name: true,
   email: true,
   role: true,
+  isHighPriority: true,
+  canVerifyAssets: true,
+  canManageUsers: true,
+  canApproveTransfers: true,
+  canEditAccessRights: true,
+  gdprAccessLevel: true,
 });
 
 export const insertIPAssetSchema = createInsertSchema(ipAssets).pick({

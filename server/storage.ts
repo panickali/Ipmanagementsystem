@@ -12,6 +12,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, userData: Partial<User>): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   
   // IP Asset methods
   getIPAsset(id: number): Promise<IPAsset | undefined>;
@@ -99,6 +101,22 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id, createdAt };
     this.users.set(id, user);
     return user;
+  }
+  
+  async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
+    const existingUser = this.users.get(id);
+    if (!existingUser) return undefined;
+    
+    const updatedUser: User = { 
+      ...existingUser, 
+      ...userData
+    };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+  
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
   
   // IP Asset methods
