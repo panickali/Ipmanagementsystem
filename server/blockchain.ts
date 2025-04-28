@@ -1,15 +1,36 @@
 import { ethers } from 'ethers';
 
-// Load contract ABIs
-import IPRegistryABI from '../client/src/contracts/IPRegistry.sol';
-import OwnershipManagementABI from '../client/src/contracts/OwnershipManagement.sol';
-import GDPRComplianceABI from '../client/src/contracts/GDPRCompliance.sol';
-import LicensingABI from '../client/src/contracts/Licensing.sol';
+// Define contract ABIs
+// In a real app, these would be imported from compiled contract JSON files
+// For now, we'll use placeholder ABIs that represent the functions we need
+const IPRegistryABI = [
+  "function registerIP(string memory ipfsHash, string memory metadata, address owner) external returns (bytes32)",
+  "function getIPOwner(string memory ipfsHash) external view returns (address)",
+  "function getIPMetadata(string memory ipfsHash) external view returns (string memory)"
+];
+
+const OwnershipManagementABI = [
+  "function transferOwnership(string memory ipfsHash, address from, address to) external returns (bool)",
+  "function getOwnershipHistory(string memory ipfsHash) external view returns (address[] memory)"
+];
+
+const GDPRComplianceABI = [
+  "function requestDataDeletion(string memory ipfsHash) external returns (bool)",
+  "function setDataAccessLevel(string memory ipfsHash, uint8 level) external returns (bool)",
+  "function getDataAccessAudit(string memory ipfsHash) external view returns (address[] memory, uint256[] memory)"
+];
+
+const LicensingABI = [
+  "function createLicense(string memory ipfsHash, string memory licenseTerms, address licensee) external returns (bytes32)",
+  "function getLicenseStatus(bytes32 licenseId) external view returns (uint8)",
+  "function revokeLicense(bytes32 licenseId) external returns (bool)"
+];
 
 // Configure blockchain connection
 const blockchainConfig = {
   url: process.env.BLOCKCHAIN_URL || 'http://localhost:8545',
-  chainId: process.env.BLOCKCHAIN_CHAIN_ID ? parseInt(process.env.BLOCKCHAIN_CHAIN_ID) : 1337
+  chainId: process.env.BLOCKCHAIN_CHAIN_ID ? parseInt(process.env.BLOCKCHAIN_CHAIN_ID) : 1337,
+  networkName: process.env.BLOCKCHAIN_NETWORK || 'Local Development Network'
 };
 
 // Contract addresses - would come from environment in production
@@ -20,42 +41,121 @@ const contractAddresses = {
   licensing: process.env.LICENSING_ADDRESS || '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
 };
 
-// Create provider
+// Initialize provider and signer
 let provider: ethers.JsonRpcProvider;
+let connected = false;
+let networkInfo: any = { name: 'Unknown' };
+
 try {
-  provider = new ethers.JsonRpcProvider(blockchainConfig.url, blockchainConfig.chainId);
+  // Attempt to connect to the blockchain network
+  provider = new ethers.JsonRpcProvider(blockchainConfig.url, {
+    chainId: blockchainConfig.chainId,
+    name: blockchainConfig.networkName,
+  });
+  
+  // Try to get network info to verify connection
+  provider.getNetwork()
+    .then(network => {
+      connected = true;
+      networkInfo = network;
+      console.log(`Connected to blockchain network: ${network.name} (chainId: ${network.chainId})`);
+    })
+    .catch(err => {
+      console.error('Failed to get network information:', err);
+      connected = false;
+    });
+    
 } catch (error) {
   console.error('Failed to connect to blockchain provider:', error);
   // Create a fallback provider that will be used for mock responses
   provider = new ethers.JsonRpcProvider('http://localhost:8545');
+  connected = false;
 }
 
-// Create contract instances
-// Note: In a real implementation, these would be properly initialized with the correct ABIs
-const contracts = {
-  ipRegistry: null, // new ethers.Contract(contractAddresses.ipRegistry, IPRegistryABI, provider),
-  ownershipManagement: null, // new ethers.Contract(contractAddresses.ownershipManagement, OwnershipManagementABI, provider),
-  gdprCompliance: null, // new ethers.Contract(contractAddresses.gdprCompliance, GDPRComplianceABI, provider),
-  licensing: null // new ethers.Contract(contractAddresses.licensing, LicensingABI, provider)
-};
+// Create contract instances with proper ABIs
+const contracts: any = {};
+
+try {
+  if (connected) {
+    // Create actual contract instances when connected
+    contracts.ipRegistry = new ethers.Contract(contractAddresses.ipRegistry, IPRegistryABI as any, provider);
+    contracts.ownershipManagement = new ethers.Contract(contractAddresses.ownershipManagement, OwnershipManagementABI as any, provider);
+    contracts.gdprCompliance = new ethers.Contract(contractAddresses.gdprCompliance, GDPRComplianceABI as any, provider);
+    contracts.licensing = new ethers.Contract(contractAddresses.licensing, LicensingABI as any, provider);
+    console.log('Smart contracts initialized successfully');
+  } else {
+    // Create placeholder contract instances that will be populated later
+    contracts.ipRegistry = null;
+    contracts.ownershipManagement = null;
+    contracts.gdprCompliance = null;
+    contracts.licensing = null;
+    console.log('Using placeholder smart contracts (blockchain connection not available)');
+  }
+} catch (error) {
+  console.error('Error initializing smart contracts:', error);
+  contracts.ipRegistry = null;
+  contracts.ownershipManagement = null;
+  contracts.gdprCompliance = null;
+  contracts.licensing = null;
+}
 
 /**
  * Register IP on the blockchain
  * @param ipfsHash IPFS hash of the IP asset
- * @param metadata Metadata of the IP asset
+ * @param metadata Metadata of the IP asset containing type, name, description
  * @param ownerAddress Owner's blockchain address
  * @returns Transaction hash
  */
 export async function registerIP(ipfsHash: string, metadata: any, ownerAddress: string): Promise<string> {
   try {
-    // In a real implementation, we would use a wallet with the owner's private key
-    const wallet = new ethers.Wallet(process.env.BLOCKCHAIN_PRIVATE_KEY || '0x0123456789012345678901234567890123456789012345678901234567890123', provider);
+    // Get wallet for transaction signing
+    const privateKey = process.env.BLOCKCHAIN_PRIVATE_KEY || '0x0123456789012345678901234567890123456789012345678901234567890123';
+    const wallet = new ethers.Wallet(privateKey, provider);
     
-    // For the demo, we'll return a mock transaction hash
-    return `0x${Math.random().toString(16).substring(2, 42)}`;
+    if (connected && contracts.ipRegistry) {
+      console.log(`Registering IP asset on blockchain: ${ipfsHash} for owner ${ownerAddress}`);
+      console.log(`Asset Type: ${metadata.type}, Name: ${metadata.name}`);
+      
+      // Connect the contract with the signer
+      const contractWithSigner = contracts.ipRegistry.connect(wallet);
+      
+      // Prepare metadata for on-chain storage
+      const metadataForChain = {
+        name: metadata.name,
+        description: metadata.description,
+        assetType: metadata.type, // "copyright", "patent", "trademark", or "design"
+        ipfsHash: ipfsHash,
+        timestamp: Date.now(),
+        category: metadata.category || 'general'
+      };
+      
+      // Convert metadata to JSON string
+      const metadataJson = JSON.stringify(metadataForChain);
+      
+      // Call the contract to register the IP with its metadata
+      // This assumes your smart contract has a registerIP function with this signature
+      const tx = await contractWithSigner.registerIP(
+        ipfsHash,
+        metadataJson,
+        ownerAddress,
+        {
+          gasLimit: 1000000 // Adjust gas limit as needed
+        }
+      );
+      
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
+      console.log(`IP registration successful. Transaction hash: ${receipt.hash}`);
+      
+      return receipt.hash;
+    } else {
+      console.log('Using mock registration (blockchain not connected)');
+      // Return a mock transaction hash for demonstration
+      return `0x${Math.random().toString(16).substring(2, 42)}`;
+    }
   } catch (error) {
     console.error('Error registering IP on blockchain:', error);
-    throw new Error('Failed to register IP on blockchain');
+    throw new Error(`Failed to register IP on blockchain: ${error.message}`);
   }
 }
 
