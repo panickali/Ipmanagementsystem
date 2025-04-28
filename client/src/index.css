@@ -105,3 +105,103 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Animations for micro-interactions */
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.animate-slideIn {
+  animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.3s ease-out;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-highlight {
+  animation: highlight 1.5s ease-out;
+}
+
+@keyframes highlight {
+  0% { background-color: transparent; }
+  20% { background-color: rgba(var(--primary), 0.1); }
+  100% { background-color: transparent; }
+}
+
+.animate-pulse-once {
+  animation: pulseOnce 1s ease-out;
+}
+
+@keyframes pulseOnce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.hover-scale {
+  transition: transform 0.2s ease-out;
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-lift {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.copy-notification {
+  position: relative;
+}
+
+.copy-notification::after {
+  content: 'Copied!';
+  position: absolute;
+  top: -20px;
+  right: 0;
+  background-color: hsl(var(--primary));
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.copy-notification.active::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Progress indicator animation */
+.progress-indicator {
+  background: linear-gradient(90deg, 
+    hsla(var(--primary), 0.2) 0%, 
+    hsla(var(--primary), 0.4) 50%, 
+    hsla(var(--primary), 0.2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
