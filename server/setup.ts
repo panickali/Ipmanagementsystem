@@ -58,6 +58,12 @@ async function startIPFSNode() {
           MDNS: {
             Enabled: false
           }
+        },
+        API: {
+          HTTPHeaders: {
+            "Access-Control-Allow-Origin": ["*"],
+            "Access-Control-Allow-Methods": ["PUT", "POST", "GET"]
+          }
         }
       }
     });
