@@ -78,5 +78,17 @@
       "salt": "e/77znUW1MmJMmojsk4JGWht",
       "hash": "sha2-512"
     }
+  },
+  "API": {
+    "HTTPHeaders": {
+      "Access-Control-Allow-Origin": [
+        "*"
+      ],
+      "Access-Control-Allow-Methods": [
+        "PUT",
+        "POST",
+        "GET"
+      ]
+    }
   }
 }
