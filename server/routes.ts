@@ -45,27 +45,23 @@ async function checkDatabaseConnection() {
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication routes
-  setupAuth(app);
-  
-  // Health check endpoint
-  app.get("/api/health", async (req, res) => {
+// Health check endpoint function
+async function healthCheck(req: Request, res: Response) {
     try {
       // Check database connection
       const dbStatus = await checkDatabaseConnection();
-      
+
       // Check IPFS connection
       const ipfsStatus = await checkIPFSStatus();
-      
+
       // Check blockchain connection
       const blockchainStatus = await checkBlockchainStatus();
-      
+
       // Determine overall status
       const allServicesHealthy = dbStatus.healthy && 
         ipfsStatus.online && 
         blockchainStatus.connected;
-      
+
       // Return health status
       res.status(allServicesHealthy ? 200 : 503).json({
         status: allServicesHealthy ? "ok" : "degraded",
@@ -84,7 +80,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error instanceof Error ? error.message : String(error)
       });
     }
-  });
+  }
+
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication routes
+  setupAuth(app);
+
+  app.get('/api/health', healthCheck);
 
   // API routes
   // IP Assets
@@ -102,15 +105,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const assetId = parseInt(req.params.id);
       const asset = await storage.getIPAsset(assetId);
-      
+
       if (!asset) {
         return res.status(404).json({ message: "IP asset not found" });
       }
-      
+
       if (asset.ownerId !== req.user!.id) {
         return res.status(403).json({ message: "You don't have permission to view this asset" });
       }
-      
+
       res.json(asset);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch IP asset" });
@@ -124,20 +127,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { name, description, type } = req.body;
-      
+
       if (!name || !description || !type) {
         return res.status(400).json({ message: "Missing required fields" });
       }
-      
+
       // Upload file to IPFS
       const ipfsHash = await uploadToIPFS(req.file.buffer);
-      
+
       // Check if this hash already exists
       const existingAsset = await storage.getIPAssetByIPFSHash(ipfsHash);
       if (existingAsset) {
         return res.status(409).json({ message: "This file has already been registered" });
       }
-      
+
       // Register on blockchain
       // In a real implementation, we would use the user's blockchain address
       const blockchainTxHash = await blockchain.registerIP(ipfsHash, {
@@ -146,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type,
         ownerId: req.user!.id
       }, "0x123456789");
-      
+
       // Create IP asset in database
       const asset = await storage.createIPAsset({
         name,
@@ -157,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         blockchainTxHash,
         status: "verified" // Auto-verify for demo
       });
-      
+
       res.status(201).json(asset);
     } catch (error) {
       console.error(error);
@@ -169,15 +172,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const assetId = parseInt(req.params.id);
       const asset = await storage.getIPAsset(assetId);
-      
+
       if (!asset) {
         return res.status(404).json({ message: "IP asset not found" });
       }
-      
+
       if (asset.ownerId !== req.user!.id) {
         return res.status(403).json({ message: "You don't have permission to update this asset" });
       }
-      
+
       // Update asset
       const updatedAsset = await storage.updateIPAsset(assetId, req.body);
       res.json(updatedAsset);
@@ -190,15 +193,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const assetId = parseInt(req.params.id);
       const asset = await storage.getIPAsset(assetId);
-      
+
       if (!asset) {
         return res.status(404).json({ message: "IP asset not found" });
       }
-      
+
       if (asset.ownerId !== req.user!.id) {
         return res.status(403).json({ message: "You don't have permission to delete this asset" });
       }
-      
+
       // Delete asset
       await storage.deleteIPAsset(assetId);
       res.status(204).send();
@@ -221,22 +224,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transfers", isAuthenticated, async (req, res) => {
     try {
       const { ipAssetId, toUserId } = req.body;
-      
+
       if (!ipAssetId || !toUserId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
-      
+
       // Check if IP asset exists and belongs to the user
       const asset = await storage.getIPAsset(ipAssetId);
-      
+
       if (!asset) {
         return res.status(404).json({ message: "IP asset not found" });
       }
-      
+
       if (asset.ownerId !== req.user!.id) {
         return res.status(403).json({ message: "You don't have permission to transfer this asset" });
       }
-      
+
       // Create transfer
       const transfer = await storage.createTransfer({
         ipAssetId,
@@ -244,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toUserId,
         status: "pending"
       });
-      
+
       res.status(201).json(transfer);
     } catch (error) {
       res.status(500).json({ message: "Failed to create transfer" });
@@ -255,37 +258,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const transferId = parseInt(req.params.id);
       const transfer = await storage.getTransfer(transferId);
-      
+
       if (!transfer) {
         return res.status(404).json({ message: "Transfer not found" });
       }
-      
+
       // Only the recipient can accept/reject the transfer
       if (transfer.toUserId !== req.user!.id) {
         return res.status(403).json({ message: "You don't have permission to update this transfer" });
       }
-      
+
       // Update transfer
       const { status } = req.body;
-      
+
       if (status === "verified") {
         // Perform blockchain transfer
         const asset = await storage.getIPAsset(transfer.ipAssetId);
         if (!asset) {
           return res.status(404).json({ message: "IP asset not found" });
         }
-        
+
         // Update asset ownership in the database
         await storage.updateIPAsset(transfer.ipAssetId, {
           ownerId: transfer.toUserId
         });
       }
-      
+
       const updatedTransfer = await storage.updateTransfer(transferId, {
         status: status as any,
         blockchainTxHash: status === "verified" ? `0x${Math.random().toString(16).substring(2, 42)}` : undefined
       });
-      
+
       res.json(updatedTransfer);
     } catch (error) {
       res.status(500).json({ message: "Failed to update transfer" });
@@ -306,22 +309,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/licenses", isAuthenticated, async (req, res) => {
     try {
       const { ipAssetId, licenseeName, licenseeEmail, termsText, startDate, endDate } = req.body;
-      
+
       if (!ipAssetId || !licenseeName || !licenseeEmail || !termsText || !startDate) {
         return res.status(400).json({ message: "Missing required fields" });
       }
-      
+
       // Check if IP asset exists and belongs to the user
       const asset = await storage.getIPAsset(ipAssetId);
-      
+
       if (!asset) {
         return res.status(404).json({ message: "IP asset not found" });
       }
-      
+
       if (asset.ownerId !== req.user!.id) {
         return res.status(403).json({ message: "You don't have permission to license this asset" });
       }
-      
+
       // Create license on blockchain
       const blockchainTxHash = await blockchain.createLicense(asset.ipfsHash, {
         licenseeName,
@@ -330,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate,
         endDate
       }, "0x123456789");
-      
+
       // Create license in database
       const license = await storage.createLicense({
         ipAssetId,
@@ -343,7 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         blockchainTxHash,
         status: "verified" // Auto-verify for demo
       });
-      
+
       res.status(201).json(license);
     } catch (error) {
       res.status(500).json({ message: "Failed to create license" });
@@ -368,7 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checkBlockchainStatus(),
         checkIPFSStatus()
       ]);
-      
+
       res.json({
         blockchain: blockchainStatus,
         ipfs: ipfsStatus,
@@ -399,10 +402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getPendingTransfersByUser(userId),
         storage.getLicensesByLicenser(userId)
       ]);
-      
+
       // Remove password from user data
       const { password, ...userData } = user!;
-      
+
       res.json({
         user: userData,
         assets,
