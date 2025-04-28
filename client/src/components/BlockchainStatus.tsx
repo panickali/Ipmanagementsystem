@@ -87,6 +87,10 @@ const BlockchainStatus = () => {
     );
   }
 
+  // Default values if data is undefined or incomplete
+  const blockchain = data?.blockchain || { connected: false, network: 'Unknown', nodeUrl: 'Not available' };
+  const ipfs = data?.ipfs || { online: false, gateway: 'Not available', api: 'Not available' };
+  
   return (
     <>
       <Card className="bg-white rounded-lg shadow mb-6">
@@ -97,20 +101,20 @@ const BlockchainStatus = () => {
         <CardContent className="p-4">
           <div className="bg-neutral-100 rounded-lg p-4 mb-4 flex items-start md:items-center flex-col md:flex-row md:justify-between">
             <div className="flex items-center mb-3 md:mb-0">
-              <div className={`flex-shrink-0 h-10 w-10 rounded-full ${data?.blockchain.connected ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white`}>
+              <div className={`flex-shrink-0 h-10 w-10 rounded-full ${blockchain.connected ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white`}>
                 <CheckCircle2 />
               </div>
               <div className="ml-4">
                 <div className="text-sm font-medium text-neutral-900">Local Blockchain Network</div>
-                <div className={`text-sm ${data?.blockchain.connected ? 'text-green-500' : 'text-red-500'}`}>
-                  {data?.blockchain.connected ? 'Connected' : 'Disconnected'}
+                <div className={`text-sm ${blockchain.connected ? 'text-green-500' : 'text-red-500'}`}>
+                  {blockchain.connected ? 'Connected' : 'Disconnected'}
                 </div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-neutral-700 font-mono">
-                <span className="block"><span className="font-medium">Network:</span> {data?.blockchain.network}</span>
-                <span className="block"><span className="font-medium">Node:</span> {data?.blockchain.nodeUrl}</span>
+                <span className="block"><span className="font-medium">Network:</span> {blockchain.network}</span>
+                <span className="block"><span className="font-medium">Node:</span> {blockchain.nodeUrl}</span>
               </div>
               <Button 
                 variant="outline"
@@ -124,22 +128,22 @@ const BlockchainStatus = () => {
           
           <div className="bg-neutral-100 rounded-lg p-4 mb-4 flex items-start md:items-center flex-col md:flex-row md:justify-between">
             <div className="flex items-center mb-3 md:mb-0">
-              <div className={`flex-shrink-0 h-10 w-10 rounded-full ${data?.ipfs.online ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white`}>
+              <div className={`flex-shrink-0 h-10 w-10 rounded-full ${ipfs.online ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white`}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
               </div>
               <div className="ml-4">
                 <div className="text-sm font-medium text-neutral-900">IPFS Node</div>
-                <div className={`text-sm ${data?.ipfs.online ? 'text-green-500' : 'text-red-500'}`}>
-                  {data?.ipfs.online ? 'Connected' : 'Disconnected'}
+                <div className={`text-sm ${ipfs.online ? 'text-green-500' : 'text-red-500'}`}>
+                  {ipfs.online ? 'Connected' : 'Disconnected'}
                 </div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-neutral-700 font-mono">
-                <span className="block"><span className="font-medium">Gateway:</span> {data?.ipfs.gateway}</span>
-                <span className="block"><span className="font-medium">API:</span> {data?.ipfs.api}</span>
+                <span className="block"><span className="font-medium">Gateway:</span> {ipfs.gateway}</span>
+                <span className="block"><span className="font-medium">API:</span> {ipfs.api}</span>
               </div>
               <Button 
                 variant="outline"

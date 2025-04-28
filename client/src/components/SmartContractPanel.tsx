@@ -21,6 +21,16 @@ interface Transaction {
 }
 
 const SmartContractPanel = ({ isOpen, onClose, contracts }: SmartContractPanelProps) => {
+  // Default contract addresses if not provided
+  const defaultAddresses = {
+    ipRegistry: "Contract not available",
+    ownershipManagement: "Contract not available",
+    gdprCompliance: "Contract not available",
+    licensing: "Contract not available"
+  };
+  
+  // Use provided contracts or defaults
+  const contractAddresses = contracts || defaultAddresses;
   // Sample transactions for UI display
   const [transactions, setTransactions] = useState<Transaction[]>([
     {
@@ -90,7 +100,7 @@ const SmartContractPanel = ({ isOpen, onClose, contracts }: SmartContractPanelPr
                 <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-full">Active</span>
               </div>
               <div className="font-mono text-xs text-neutral-600 break-all">
-                {contracts?.ipRegistry || "Loading..."}
+                {contractAddresses.ipRegistry}
               </div>
             </div>
             
@@ -100,7 +110,7 @@ const SmartContractPanel = ({ isOpen, onClose, contracts }: SmartContractPanelPr
                 <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-full">Active</span>
               </div>
               <div className="font-mono text-xs text-neutral-600 break-all">
-                {contracts?.ownershipManagement || "Loading..."}
+                {contractAddresses.ownershipManagement}
               </div>
             </div>
             
@@ -110,7 +120,7 @@ const SmartContractPanel = ({ isOpen, onClose, contracts }: SmartContractPanelPr
                 <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-full">Active</span>
               </div>
               <div className="font-mono text-xs text-neutral-600 break-all">
-                {contracts?.licensing || "Loading..."}
+                {contractAddresses.licensing}
               </div>
             </div>
           </div>
