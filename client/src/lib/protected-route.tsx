@@ -1,6 +1,7 @@
+
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
-import { Redirect, Route, useLocation } from "wouter";
+import { Route, Redirect } from "wouter";
 
 export function ProtectedRoute({
   path,
@@ -14,7 +15,6 @@ export function ProtectedRoute({
       {(params) => {
         try {
           const { user, isLoading } = useAuth();
-          const [, navigate] = useLocation();
           
           if (isLoading) {
             return (
@@ -25,9 +25,7 @@ export function ProtectedRoute({
           }
           
           if (!user) {
-            // Use navigate instead of Redirect for more reliable redirection
-            navigate("/auth");
-            return null;
+            return <Redirect to="/auth" />;
           }
           
           return <Component />;
