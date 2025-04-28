@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { Route, Redirect } from "wouter";
@@ -15,7 +14,7 @@ export function ProtectedRoute({
       {(params) => {
         try {
           const { user, isLoading } = useAuth();
-          
+
           if (isLoading) {
             return (
               <div className="flex items-center justify-center min-h-screen">
@@ -23,11 +22,11 @@ export function ProtectedRoute({
               </div>
             );
           }
-          
+
           if (!user) {
             return <Redirect to="/auth" />;
           }
-          
+
           return <Component />;
         } catch (error) {
           console.error("Error in ProtectedRoute:", error);
