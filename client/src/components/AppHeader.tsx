@@ -55,16 +55,16 @@ const AppHeader = () => {
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
                 {navItems.map((item) => (
-                  <Link key={item.name} href={item.path}>
-                    <a
-                      className={`${
-                        isActive(item.path)
-                          ? "bg-primary-dark"
-                          : "hover:bg-primary-light"
-                      } text-white px-3 py-2 rounded-md text-sm font-medium`}
-                    >
-                      {item.name}
-                    </a>
+                  <Link 
+                    key={item.name} 
+                    href={item.path}
+                    className={`${
+                      isActive(item.path)
+                        ? "bg-primary-dark"
+                        : "hover:bg-primary-light"
+                    } text-white px-3 py-2 rounded-md text-sm font-medium`}
+                  >
+                    {item.name}
                   </Link>
                 ))}
               </div>
@@ -141,17 +141,17 @@ const AppHeader = () => {
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {navItems.map((item) => (
-              <Link key={item.name} href={item.path}>
-                <a
-                  className={`${
-                    isActive(item.path)
-                      ? "bg-primary-dark"
-                      : "hover:bg-primary-light"
-                  } text-white block px-3 py-2 rounded-md text-base font-medium`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.name}
-                </a>
+              <Link 
+                key={item.name} 
+                href={item.path}
+                className={`${
+                  isActive(item.path)
+                    ? "bg-primary-dark"
+                    : "hover:bg-primary-light"
+                } text-white block px-3 py-2 rounded-md text-base font-medium`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {item.name}
               </Link>
             ))}
           </div>
