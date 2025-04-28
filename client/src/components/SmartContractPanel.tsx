@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { X, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -54,16 +54,20 @@ const SmartContractPanel = ({ isOpen, onClose, contracts }: SmartContractPanelPr
   ]);
 
   // Handle clicking outside to close
+  const panelRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const panel = document.getElementById("smart-contract-panel");
-      if (panel && !panel.contains(event.target as Node) && isOpen) {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node) && isOpen) {
         onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Add a small delay to avoid immediate firing
+      setTimeout(() => {
+        document.addEventListener("mousedown", handleClickOutside);
+      }, 100);
     }
 
     return () => {
@@ -73,7 +77,7 @@ const SmartContractPanel = ({ isOpen, onClose, contracts }: SmartContractPanelPr
 
   return (
     <div 
-      id="smart-contract-panel"
+      ref={panelRef}
       className={`fixed right-0 top-0 h-full w-96 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-10 ${
         isOpen ? 'translate-x-0' : 'translate-x-full'
       }`}
